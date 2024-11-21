@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">SobatKendara</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="title_activity_forgot_password">ForgotPasswordActivity</string>
+    <string name="title_activity_reset_password">ResetPasswordActivity</string>
+    <string name="title_activity_register">RegisterActivity</string>
 </resources>
