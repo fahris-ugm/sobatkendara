@@ -25,6 +25,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -106,10 +108,11 @@ fun LoginScreen(
     var email by rememberSaveable { mutableStateOf("phewhe@gmail.com") }
     var password by rememberSaveable { mutableStateOf("password123") }
     var showPassword by rememberSaveable { mutableStateOf(value = false) }
-    var passwordVisibility: Boolean by rememberSaveable { mutableStateOf(false) }
     var isLoading by rememberSaveable { mutableStateOf(false) }
+    var errorMessage by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
 
+    val alphaLoading = if (isLoading) 1f else 0f
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -121,17 +124,12 @@ fun LoginScreen(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
+            readOnly = isLoading,
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        /*OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth()
-        )*/
         OutlinedTextField(
             modifier = Modifier
                 .fillMaxWidth(),
@@ -143,6 +141,7 @@ fun LoginScreen(
                 Text(text = "Password")
             },
             placeholder = { Text(text = "Type password here") },
+            readOnly = isLoading,
             shape = RoundedCornerShape(percent = 20),
             visualTransformation = if (showPassword) {
 
@@ -177,9 +176,8 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Show ProgressBar when loading
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-        }
+
+        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).alpha(alphaLoading))
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -190,23 +188,35 @@ fun LoginScreen(
                 } else {
                     isLoading = true
                     CoroutineScope(Dispatchers.Main).launch {
-                        val token = ApiService.login(context, email, password)
+                        val token = ApiService.login(context, email, password,
+                            onLoginError = { message ->
+                                //Toast.makeText(context, "Login failed: $mssage", Toast.LENGTH_SHORT).show()
+                                errorMessage = message
+                            }
+                        )
                         Log.d("LoginScreen", "Token: $token")
                         isLoading = false
                         if (token != null) {
                             Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
                             onLoginSuccess(token)
                         } else {
-                            Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
+                            //Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
             },
+            enabled = !isLoading,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Login")
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = errorMessage,
+            color = Color.Red,
+            modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally)
+        )
         Spacer(modifier = Modifier.height(16.dp))
 
         // Sign Up and Forgot Password options
@@ -217,14 +227,14 @@ fun LoginScreen(
             Text(
                 text = "Sign Up",
                 fontSize = 16.sp,
-                modifier = Modifier.clickable { onSignUp() }
+                modifier = Modifier.clickable { if (!isLoading) onSignUp() }
             )
 
             Text(
                 text = "Forgot Password?",
                 fontSize = 16.sp,
                 textAlign = TextAlign.End,
-                modifier = Modifier.clickable { onForgotPassword() }
+                modifier = Modifier.clickable { if (!isLoading) onForgotPassword() }
             )
         }
     }

@@ -35,6 +35,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -55,9 +57,11 @@ class RegisterActivity : AppCompatActivity() {
         enableEdgeToEdge()
         // Enable the action bar back button
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.title = "Register New Account"
         setContent {
             RegisterScreen(
                 onRegisterSuccess = {
+                    finish()
                 }
             )
         }
@@ -73,12 +77,10 @@ class RegisterActivity : AppCompatActivity() {
 @Preview(showBackground = true)
 @Composable
 fun RegisterScreenPreview() {
-    //obatKendaraTheme {
         RegisterScreen(
             onRegisterSuccess = {
             }
         )
-    //}
 }
 
 @Composable
@@ -91,9 +93,11 @@ fun RegisterScreen(
     var confirmPassword by rememberSaveable { mutableStateOf("password123") }
     var notifEmail by rememberSaveable { mutableStateOf("phewhe@gmail.com") }
     var showPassword by rememberSaveable { mutableStateOf(value = false) }
-    var passwordVisibility: Boolean by rememberSaveable { mutableStateOf(false) }
+    var errorMessage by rememberSaveable { mutableStateOf("") }
+
     var isLoading by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val alphaLoading = if (isLoading) 1f else 0f
 
     Column(
         modifier = Modifier
@@ -109,6 +113,7 @@ fun RegisterScreen(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
+            readOnly = isLoading,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -124,6 +129,7 @@ fun RegisterScreen(
             label = {
                 Text(text = "Password")
             },
+            readOnly = isLoading,
             placeholder = { Text(text = "Type password here") },
             shape = RoundedCornerShape(percent = 20),
             visualTransformation = if (showPassword) {
@@ -163,6 +169,7 @@ fun RegisterScreen(
             label = {
                 Text(text = "Confirm Password")
             },
+            readOnly = isLoading,
             placeholder = { Text(text = "Confirm password here") },
             shape = RoundedCornerShape(percent = 20),
             visualTransformation = if (showPassword) {
@@ -196,16 +203,21 @@ fun RegisterScreen(
             value = notifEmail,
             onValueChange = { notifEmail = it },
             label = { Text("Notification Email Address") },
+            readOnly = isLoading,
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Show ProgressBar when loading
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-        }
+        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).alpha(alphaLoading))
 
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = errorMessage,
+            color = Color.Red,
+            modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally)
+        )
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
@@ -217,20 +229,25 @@ fun RegisterScreen(
                 } else {
                     isLoading = true
                     CoroutineScope(Dispatchers.Main).launch {
-                        /*val token = ApiService.login(context, email, password)
-                        Log.d("LoginScreen", "Token: $token")
+                        val message = ApiService.signup(context, email, password, notifEmail,
+                            onSignupError = { errorMessage = it }
+                        )
+                        Log.d("RegisterScreen", "Message: $message")
                         isLoading = false
-                        if (token != null) {
-                            Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess(token)
+                        if (message != null) {
+                            if (message.contains("success")) {
+                                Toast.makeText(context, "Registration successful", Toast.LENGTH_SHORT).show()
+                                onRegisterSuccess(email)
+                            } else {
+                                Toast.makeText(context, "Registration failed: $message", Toast.LENGTH_SHORT).show()
+                            }
                         } else {
-                            Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
+                            //Toast.makeText(context, "Registration failed", Toast.LENGTH_SHORT).show()
                         }
-
-                         */
                     }
                 }
             },
+            enabled = !isLoading,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Register")
