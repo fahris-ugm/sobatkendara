@@ -1,4 +1,4 @@
-package id.ac.ugm.fahris.sobatkendara
+package id.ac.ugm.fahris.sobatkendara.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

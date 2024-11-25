@@ -30,11 +30,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MainContent(
+            /*MainContent(
                 onMenuClick = {
 
                 }
-            )
+            )*/
+            MainCompose()
         }
     }
 }

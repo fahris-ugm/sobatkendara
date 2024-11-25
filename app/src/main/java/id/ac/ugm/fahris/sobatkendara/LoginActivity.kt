@@ -47,7 +47,7 @@ class LoginActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Check if the token exists in SharedPreferences
         val sharedPreferences = getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
-        val token = null//sharedPreferences.getString("auth_token", null)
+        val token = sharedPreferences.getString("auth_token", null)
 
         if (token != null) {
             // Token exists, start MainActivity
@@ -58,23 +58,20 @@ class LoginActivity : ComponentActivity() {
                 //SobatKendaraTheme {
                 LoginScreen(
                     onLoginSuccess = { token ->
-
                         with(sharedPreferences.edit()) {
                             putString("auth_token", token)
                             apply()
                         }
                         // Navigate to MainActivity on successful login
-                        //startActivity(Intent(this, MainActivity::class.java))
-                        //finish()
+                        startActivity(Intent(this, MainActivity::class.java))
+                        finish()
                     },
                     onSignUp = {
                         // Navigate to Sign Up screen
-                        //Toast.makeText(this, "Sign Up clicked", Toast.LENGTH_SHORT).show()
                         this.startActivity(Intent(this, RegisterActivity::class.java))
                     },
                     onForgotPassword = {
                         // Handle Forgot Password action
-                        //Toast.makeText(this, "Forgot Password clicked", Toast.LENGTH_SHORT).show()
                         this.startActivity(Intent(this, RequestResetPasswordActivity::class.java))
                     }
                 )
@@ -145,13 +142,9 @@ fun LoginScreen(
             readOnly = isLoading,
             shape = RoundedCornerShape(percent = 20),
             visualTransformation = if (showPassword) {
-
                 VisualTransformation.None
-
             } else {
-
                 PasswordVisualTransformation()
-
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             trailingIcon = {
@@ -173,15 +166,10 @@ fun LoginScreen(
                 }
             }
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
         // Show ProgressBar when loading
-
         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).alpha(alphaLoading))
-
         Spacer(modifier = Modifier.height(16.dp))
-
         Button(
             onClick = {
                 if (email.isEmpty() || password.isEmpty()) {
@@ -191,7 +179,6 @@ fun LoginScreen(
                     CoroutineScope(Dispatchers.Main).launch {
                         val token = ApiService.login(context, email, password,
                             onLoginError = { message ->
-                                //Toast.makeText(context, "Login failed: $mssage", Toast.LENGTH_SHORT).show()
                                 errorMessage = message
                             }
                         )
