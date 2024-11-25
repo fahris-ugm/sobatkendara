@@ -15,6 +15,7 @@ fun NavGraphBuilder.mainGraph(drawerState: DrawerState) {
             DashboardScreen(drawerState)
         }
         composable(MainNavOption.ConfigScreen.name){
+
             ConfigScreen(drawerState)
         }
         composable(MainNavOption.ChangePasswordScreen.name){
