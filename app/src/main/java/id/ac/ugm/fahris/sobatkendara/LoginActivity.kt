@@ -74,7 +74,8 @@ class LoginActivity : ComponentActivity() {
                     },
                     onForgotPassword = {
                         // Handle Forgot Password action
-                        Toast.makeText(this, "Forgot Password clicked", Toast.LENGTH_SHORT).show()
+                        //Toast.makeText(this, "Forgot Password clicked", Toast.LENGTH_SHORT).show()
+                        this.startActivity(Intent(this, RequestResetPasswordActivity::class.java))
                     }
                 )
                 //}

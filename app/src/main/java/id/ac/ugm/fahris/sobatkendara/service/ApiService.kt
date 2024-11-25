@@ -158,4 +158,138 @@ object ApiService {
             }
         }
     }
+
+    suspend fun requestOTP(context: Context, email: String, onRequestOTPError: (String) -> Unit): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL("${BASE_URL}/request-otp")
+                val httpsURLConnection = url.openConnection() as HttpsURLConnection
+                httpsURLConnection.connectTimeout = connectionTimeout
+
+                if (ENVIRONMENT == "development") {
+                    // Set up SSL to ignore certificate validation
+                    httpsURLConnection.sslSocketFactory =
+                        UnsafeSSLHelper.getUnsafeSSLSocketFactory()
+                    httpsURLConnection.hostnameVerifier =
+                        UnsafeSSLHelper.getUnsafeHostnameVerifier()
+                }
+
+                httpsURLConnection.requestMethod = "POST"
+                httpsURLConnection.setRequestProperty("Content-Type", "application/json")
+                httpsURLConnection.doOutput = true
+
+                // Create the JSON request body
+                val jsonInputString = JSONObject()
+                jsonInputString.put("email", email)
+
+                // Write the request body
+                val outputStream: OutputStream = httpsURLConnection.outputStream
+                outputStream.write(jsonInputString.toString().toByteArray())
+                outputStream.flush()
+                outputStream.close()
+
+                // Check the response code
+                val responseCode = httpsURLConnection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
+                    // Read the response
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.inputStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    return@withContext jsonResponse.getString("message")
+                } else {
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.errorStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    val message = jsonResponse.getString("message")
+                    // Handle error
+                    withContext(Dispatchers.Main) {
+                        //Toast.makeText(context, "Registration failed: $responseCode - $message", Toast.LENGTH_SHORT).show()
+                        onRequestOTPError(message)
+                    }
+                    return@withContext null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    //Toast.makeText(context, "An error occurred: ${e.message}", Toast.LENGTH_SHORT).show()
+                    onRequestOTPError("An error occurred: ${e.message}")
+                }
+                return@withContext null
+            }
+        }
+    }
+
+    suspend fun resetPassword(context: Context, email: String, password: String, otp: String, onResetPasswordError: (String) -> Unit): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL("${BASE_URL}/reset-password")
+                val httpsURLConnection = url.openConnection() as HttpsURLConnection
+                httpsURLConnection.connectTimeout = connectionTimeout
+
+                if (ENVIRONMENT == "development") {
+                    // Set up SSL to ignore certificate validation
+                    httpsURLConnection.sslSocketFactory =
+                        UnsafeSSLHelper.getUnsafeSSLSocketFactory()
+                    httpsURLConnection.hostnameVerifier =
+                        UnsafeSSLHelper.getUnsafeHostnameVerifier()
+                }
+
+                httpsURLConnection.requestMethod = "POST"
+                httpsURLConnection.setRequestProperty("Content-Type", "application/json")
+                httpsURLConnection.doOutput = true
+
+                // Create the JSON request body
+                val jsonInputString = JSONObject()
+                jsonInputString.put("email", email)
+                jsonInputString.put("otp", otp)
+                jsonInputString.put("new_password", password)
+
+                // Write the request body
+                val outputStream: OutputStream = httpsURLConnection.outputStream
+                outputStream.write(jsonInputString.toString().toByteArray())
+                outputStream.flush()
+                outputStream.close()
+
+                // Check the response code
+                val responseCode = httpsURLConnection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
+                    // Read the response
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.inputStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    return@withContext jsonResponse.getString("message")
+                } else {
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.errorStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    val message = jsonResponse.getString("message")
+                    // Handle error
+                    withContext(Dispatchers.Main) {
+                        //Toast.makeText(context, "Registration failed: $responseCode - $message", Toast.LENGTH_SHORT).show()
+                        onResetPasswordError(message)
+                    }
+                    return@withContext null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    //Toast.makeText(context, "An error occurred: ${e.message}", Toast.LENGTH_SHORT).show()
+                    onResetPasswordError("An error occurred: ${e.message}")
+                }
+                return@withContext null
+            }
+        }
+    }
 }

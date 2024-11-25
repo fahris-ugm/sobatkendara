@@ -225,7 +225,7 @@ fun RegisterScreen(
                 if (email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
                     Toast.makeText(context, "Please enter all fields", Toast.LENGTH_SHORT).show()
                 } else if (password != confirmPassword) {
-                    Toast.makeText(context, "Password and confirm password not equal", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Password and confirm password are not equal", Toast.LENGTH_SHORT).show()
                 } else {
                     isLoading = true
                     CoroutineScope(Dispatchers.Main).launch {
