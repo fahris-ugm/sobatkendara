@@ -292,4 +292,125 @@ object ApiService {
             }
         }
     }
+    suspend fun changePassword(context: Context, token: String, oldPassword: String, newPassword: String, onChangePasswordError: (String) -> Unit): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL("${BASE_URL}/change-password")
+                val httpsURLConnection = url.openConnection() as HttpsURLConnection
+                httpsURLConnection.connectTimeout = connectionTimeout
+
+                if (ENVIRONMENT == "development") {
+                    // Set up SSL to ignore certificate validation
+                    httpsURLConnection.sslSocketFactory =
+                        UnsafeSSLHelper.getUnsafeSSLSocketFactory()
+                    httpsURLConnection.hostnameVerifier =
+                        UnsafeSSLHelper.getUnsafeHostnameVerifier()
+                }
+
+                httpsURLConnection.requestMethod = "POST"
+                httpsURLConnection.setRequestProperty("Content-Type", "application/json")
+                httpsURLConnection.doOutput = true
+
+                httpsURLConnection.setRequestProperty("Authorization", "Bearer $token")
+
+                // Create the JSON request body
+                val jsonInputString = JSONObject()
+                jsonInputString.put("old_password", oldPassword)
+                jsonInputString.put("new_password", newPassword)
+
+                // Write the request body
+                val outputStream: OutputStream = httpsURLConnection.outputStream
+                outputStream.write(jsonInputString.toString().toByteArray())
+                outputStream.flush()
+                outputStream.close()
+
+                // Check the response code
+                val responseCode = httpsURLConnection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Read the response
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.inputStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    return@withContext jsonResponse.getString("message")
+                } else {
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.errorStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    val message = jsonResponse.getString("message")
+                    // Handle error
+                    withContext(Dispatchers.Main) {
+                        onChangePasswordError(message)
+                    }
+                    return@withContext null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    onChangePasswordError("An error occurred: ${e.message}")
+                }
+                return@withContext null
+            }
+        }
+    }
+    suspend fun logout(context: Context, token: String, onLogoutError: (String) -> Unit): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL("${BASE_URL}/logout")
+                val httpsURLConnection = url.openConnection() as HttpsURLConnection
+                httpsURLConnection.connectTimeout = connectionTimeout
+
+                if (ENVIRONMENT == "development") {
+                    // Set up SSL to ignore certificate validation
+                    httpsURLConnection.sslSocketFactory =
+                        UnsafeSSLHelper.getUnsafeSSLSocketFactory()
+                    httpsURLConnection.hostnameVerifier =
+                        UnsafeSSLHelper.getUnsafeHostnameVerifier()
+                }
+
+                httpsURLConnection.requestMethod = "POST"
+                httpsURLConnection.setRequestProperty("Content-Type", "application/json")
+                httpsURLConnection.doOutput = true
+
+                httpsURLConnection.setRequestProperty("Authorization", "Bearer $token")
+
+                // Check the response code
+                val responseCode = httpsURLConnection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Read the response
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.inputStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    return@withContext jsonResponse.getString("message")
+                } else {
+                    val reader = BufferedReader(InputStreamReader(httpsURLConnection.errorStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    // Parse the JSON response to extract the token
+                    val jsonResponse = JSONObject(response)
+                    val message = jsonResponse.getString("message")
+                    // Handle error
+                    withContext(Dispatchers.Main) {
+                        onLogoutError(message)
+                    }
+                    return@withContext null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    onLogoutError("An error occurred: ${e.message}")
+                }
+                return@withContext null
+            }
+        }
+    }
 }

@@ -2,6 +2,7 @@ package id.ac.ugm.fahris.sobatkendara
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -13,8 +14,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import id.ac.ugm.fahris.sobatkendara.service.ApiService
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppDrawerContent
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppDrawerItemInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainCompose(
@@ -86,13 +91,20 @@ fun MainCompose(
                 TextButton(
                     onClick = {
                         openAlertDialog.value = false
-                        //Toast.makeText(navController.context, "Logout", Toast.LENGTH_SHORT).show()
-                        val context = navController.context
-                        val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
-                        sharedPreferences.edit().remove("auth_token").remove("account_email").apply()
-                        val intent = Intent(context, LoginActivity::class.java)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        context.startActivity(intent)
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val context = navController.context
+                            val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+                            val token = sharedPreferences.getString("auth_token", null)
+                            val message = ApiService.logout(context, token?: "",
+                                onLogoutError = { err -> Toast.makeText(context, "Logout failed $err", Toast.LENGTH_SHORT).show() }
+                            )
+                            Log.d("Logout", "Message: $message")
+
+                            sharedPreferences.edit().remove("auth_token").remove("account_email").apply()
+                            val intent = Intent(context, LoginActivity::class.java)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            context.startActivity(intent)
+                        }
                     }
                 ) {
                     Text("Confirm")
