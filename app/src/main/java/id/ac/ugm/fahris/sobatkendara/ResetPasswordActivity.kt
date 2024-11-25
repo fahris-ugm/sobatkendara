@@ -127,17 +127,7 @@ fun ResetPasswordScreen(
         Spacer(modifier = Modifier.height(16.dp))
         val pattern = remember { Regex("^\\d+\$") }
         val maxchar = 6
-        /*
-        OutlinedTextField(
-            value = otp,
-            onValueChange = {
-                if (it.isEmpty() || it.matches(pattern) || it.length <= maxchar) {
-                    otp = it
-                } },
-            label = { Text("OTP (check your email)") },
-            readOnly = isLoading,
-            modifier = Modifier.fillMaxWidth()
-        )*/
+
         Text(
             text = "OTP (check your email)",
             modifier = Modifier.padding(bottom = 16.dp)
@@ -232,7 +222,6 @@ fun ResetPasswordScreen(
             }
         )
         Spacer(modifier = Modifier.height(16.dp))
-
 
         // Show ProgressBar when loading
         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).alpha(alphaLoading))

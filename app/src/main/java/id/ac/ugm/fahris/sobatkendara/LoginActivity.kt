@@ -57,8 +57,9 @@ class LoginActivity : ComponentActivity() {
             setContent {
                 //SobatKendaraTheme {
                 LoginScreen(
-                    onLoginSuccess = { token ->
+                    onLoginSuccess = { email, token ->
                         with(sharedPreferences.edit()) {
+                            putString("account_email", email)
                             putString("auth_token", token)
                             apply()
                         }
@@ -87,7 +88,7 @@ class LoginActivity : ComponentActivity() {
 fun LoginScreenPreview() {
     SobatKendaraTheme {
         LoginScreen(
-            onLoginSuccess = {
+            onLoginSuccess = { email, token ->
             },
             onSignUp = {
             },
@@ -99,7 +100,7 @@ fun LoginScreenPreview() {
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (String) -> Unit,
+    onLoginSuccess: (accountEmail: String, token: String) -> Unit,
     onSignUp: () -> Unit,
     onForgotPassword: () -> Unit
 ) {
@@ -186,7 +187,7 @@ fun LoginScreen(
                         isLoading = false
                         if (token != null) {
                             Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess(token)
+                            onLoginSuccess(email, token)
                         } else {
                             //Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
                         }

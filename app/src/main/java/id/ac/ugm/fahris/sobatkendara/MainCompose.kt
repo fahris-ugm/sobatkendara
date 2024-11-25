@@ -1,5 +1,7 @@
 package id.ac.ugm.fahris.sobatkendara
 
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -84,7 +86,13 @@ fun MainCompose(
                 TextButton(
                     onClick = {
                         openAlertDialog.value = false
-                        Toast.makeText(navController.context, "Logout", Toast.LENGTH_SHORT).show()
+                        //Toast.makeText(navController.context, "Logout", Toast.LENGTH_SHORT).show()
+                        val context = navController.context
+                        val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+                        sharedPreferences.edit().remove("auth_token").remove("account_email").apply()
+                        val intent = Intent(context, LoginActivity::class.java)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        context.startActivity(intent)
                     }
                 ) {
                     Text("Confirm")
