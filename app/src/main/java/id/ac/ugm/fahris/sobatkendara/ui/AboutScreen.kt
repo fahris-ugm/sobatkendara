@@ -34,7 +34,7 @@ fun AboutScreen(
     drawerState: DrawerState,
 ) {
     Scaffold(
-        topBar = { AppBar(drawerState = drawerState) }
+        topBar = { AppBar(drawerState = drawerState,title = R.string.drawer_about) }
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(it).padding(16.dp),

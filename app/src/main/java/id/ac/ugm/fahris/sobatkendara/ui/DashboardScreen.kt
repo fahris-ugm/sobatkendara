@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DrawerState
@@ -35,7 +36,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,11 +73,13 @@ fun DashboardScreen(
     val context = LocalContext.current
     var currentLocation by rememberSaveable { mutableStateOf("Fetching location...") }
     var speed by rememberSaveable { mutableStateOf("0") }
-    var distance by rememberSaveable { mutableStateOf("0.0 km") }
+    var distance by rememberSaveable { mutableStateOf("0.0") }
     var timeElapsed by rememberSaveable { mutableStateOf("00:00:00") }
     var compassDirection by rememberSaveable { mutableStateOf("N") }
     var compassBearing by rememberSaveable { mutableStateOf(0f) }
     var isPermissionGranted by remember { mutableStateOf(false) }
+
+    var isJourneyActive by rememberSaveable { mutableStateOf(false) }
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val geocodingApi = remember { GeocodingApiService.create() }
@@ -81,6 +88,23 @@ fun DashboardScreen(
     // wrapper to handle bug of android studio failed to render permissions, sensormanager
     val isInspection = LocalInspectionMode.current
     lateinit var permissionState: MultiplePermissionsState
+
+    // Format elapsed time
+    fun formatElapsedTime(timeMillis: Long): String {
+        val seconds = (timeMillis / 1000) % 60
+        val minutes = (timeMillis / (1000 * 60)) % 60
+        val hours = (timeMillis / (1000 * 60 * 60))
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    // Timer Coroutine
+    suspend fun startTimer() {
+        var elapsedTime = 0L
+        while (isJourneyActive) {
+            delay(1000)
+            elapsedTime += 1000
+            timeElapsed = formatElapsedTime(elapsedTime)
+        }
+    }
 
     if (isInspection) {
         permissionState = object : MultiplePermissionsState {
@@ -111,6 +135,16 @@ fun DashboardScreen(
             while (true) {
                 delay(1000) // Update every second
                 speed = "${speedCalculator.getSpeed().toInt()}"
+
+                distance = String.format("%.3f",speedCalculator.getDistance())
+                // Update journey state
+                val journeyActive = speedCalculator.isJourneyActive()
+                if (journeyActive != isJourneyActive) {
+                    isJourneyActive = journeyActive
+                    if (isJourneyActive) {
+                        coroutineScope.launch { startTimer() }
+                    }
+                }
             }
         }
     }
@@ -140,7 +174,7 @@ fun DashboardScreen(
     }
 
     Scaffold(
-        topBar = { AppBar(drawerState = drawerState) }
+        topBar = { AppBar(drawerState = drawerState,title = R.string.app_name) }
     ) {
 
         Column(
@@ -152,6 +186,7 @@ fun DashboardScreen(
             Text(
                 text = currentLocation,
                 fontSize = 14.sp,
+                minLines = 3,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -159,25 +194,45 @@ fun DashboardScreen(
 
             SpeedDisplay(speed)
 
-            // Distance Information
-            Text(
-                text = "Distance: $distance",
-                fontSize = 24.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Time Elapsed Information
-            Text(
-                text = "Time Elapsed: $timeElapsed",
-                fontSize = 24.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Time Elapsed Information
+                Text(
+                    text = buildAnnotatedString {
+                        append("Time elapsed\n")
+                        withStyle(style = SpanStyle(fontSize = 32.sp)) { // Smaller font size for "km/h"
+                            append(timeElapsed)
+                        }
+                    },
+                    lineHeight = 40.sp,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                // Distance Information
+                Text(
+                    text = buildAnnotatedString {
+                        append("Distance\n")
+                        withStyle(style = SpanStyle(fontSize = 32.sp)) { // Smaller font size for "km/h"
+                            append(distance)
+                        }
+                        append(" km")
+                    },
+                    lineHeight = 40.sp,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
 
             // Compass Direction
             Text(
                 text = "$compassDirection",
-                fontSize = 24.sp
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
             )
             Image(
                 painter = painterResource(id = R.drawable.ic_compass_rect),
@@ -200,7 +255,7 @@ fun DashboardScreenPreview() {
 fun SpeedDisplay(speed: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(16.dp)
+        modifier = Modifier.padding(2.dp)
     ) {
         Text(
             text = speed,

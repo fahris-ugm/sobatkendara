@@ -26,6 +26,14 @@ class FusionSpeedCalculator(context: Context) : SensorEventListener {
 
     private var isGpsAvailable = false
 
+    private var lastLocation: Location? = null
+    private var distance: Double = 0.0
+    private var isJourneyActive = false
+    private var stationaryTime = 0L // Time spent stationary
+
+    private val stationThreshold = 10000L // 10 seconds (adjust as needed)
+    private val movementThreshold = 0.3 // m/s (adjust for "start moving" detection)
+
     // Start listening to sensors and GPS
     fun start() {
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
@@ -90,6 +98,7 @@ class FusionSpeedCalculator(context: Context) : SensorEventListener {
                     val location = locationResult.lastLocation ?: return
                     gpsSpeed = (location.speed * 3.6).roundToInt().toDouble() // Convert m/s to km/h
                     isGpsAvailable = true
+                    onLocationUpdate(location)
                 }
             },
             Looper.getMainLooper()
@@ -98,5 +107,42 @@ class FusionSpeedCalculator(context: Context) : SensorEventListener {
 
     private fun stopGpsUpdates() {
         fusedLocationProviderClient.removeLocationUpdates(object : LocationCallback() {})
+    }
+    // Update this to calculate distance
+    fun onLocationUpdate(location: Location) {
+        if (lastLocation != null) {
+            val speed = location.speed // Speed in m/s
+            if (speed > movementThreshold) {
+                isJourneyActive = true
+                stationaryTime = 0L
+            } else {
+                if (isJourneyActive) {
+                    stationaryTime += 2000L // Location update interval
+                    if (stationaryTime >= stationThreshold) {
+                        // Journey has ended
+                        isJourneyActive = false
+                        resetJourney()
+                    }
+                }
+            }
+
+            if (isJourneyActive) {
+                distance += lastLocation!!.distanceTo(location) / 1000.0 // Convert to kilometers
+            }
+        }
+
+        lastLocation = location
+    }
+
+    fun getDistance(): Double {
+        return distance
+    }
+    fun isJourneyActive(): Boolean {
+        return isJourneyActive
+    }
+
+    private fun resetJourney() {
+        distance = 0.0
+        stationaryTime = 0L
     }
 }
