@@ -10,4 +10,9 @@
     <string name="drawer_about">About</string>
     <string name="drawer_logout">Logout</string>
     <string name="drawer_menu_description">Menu</string>
+    <string name="app_fullname">Fahris Mumtaza Ahsan</string>
+    <string name="app_nim">23/525965/PTK/15407</string>
+    <string name="app_description">Aplikasi ini dikembangkan dalam rangka tugas mata kuliah TIF227116 - Pengembangan Aplikasi Peranti Bergerak Lanjut</string>
+    <string name="app_institution">Department of Electrical and Information Engineering - Universitas Gajah Mada</string>
+    <string name="app_year">2024</string>
 </resources>
