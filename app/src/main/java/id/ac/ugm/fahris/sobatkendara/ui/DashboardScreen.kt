@@ -18,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,6 +37,8 @@ import androidx.compose.ui.unit.sp
 
 import com.google.android.gms.location.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.MultiplePermissionsState
+import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -42,6 +46,9 @@ import id.ac.ugm.fahris.sobatkendara.service.GeocodingApiService
 
 
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
+import id.ac.ugm.fahris.sobatkendara.ui.components.FusionSpeedCalculator
+import id.ac.ugm.fahris.sobatkendara.ui.components.SpeedCalculator
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -51,6 +58,7 @@ import kotlin.math.roundToInt
 fun DashboardScreen(
     drawerState: DrawerState,
 ) {
+
     val context = LocalContext.current
     var currentLocation by rememberSaveable { mutableStateOf("Fetching location...") }
     var speed by rememberSaveable { mutableStateOf("0") }
@@ -59,16 +67,46 @@ fun DashboardScreen(
     var compassDirection by rememberSaveable { mutableStateOf("N") }
     var isPermissionGranted by remember { mutableStateOf(false) }
 
-    val permissionState = rememberMultiplePermissionsState(
-        permissions = listOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-    )
-
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val geocodingApi = remember { GeocodingApiService.create() }
     val coroutineScope = rememberCoroutineScope()
+
+    // wrapper to handle bug of android studio failed to render permissions, sensormanager
+    val isInspection = LocalInspectionMode.current
+    lateinit var permissionState: MultiplePermissionsState
+
+    if (isInspection) {
+        permissionState = object : MultiplePermissionsState {
+            override val allPermissionsGranted: Boolean = false
+            override val permissions: List<PermissionState> = emptyList()
+            override val revokedPermissions: List<PermissionState> = emptyList()
+            override val shouldShowRationale: Boolean = false
+            override fun launchMultiplePermissionRequest() {}
+        }
+    } else {
+        permissionState = rememberMultiplePermissionsState(
+            permissions = listOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+        //val speedCalculator = remember { SpeedCalculator(context) }
+        val speedCalculator = remember { FusionSpeedCalculator(context) }
+        // Start and stop speed calculation
+        DisposableEffect(Unit) {
+            speedCalculator.start()
+            onDispose {
+                speedCalculator.stop()
+            }
+        }
+        // Update speed periodically
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(1000) // Update every second
+                speed = "${speedCalculator.getSpeed().toInt()}"
+            }
+        }
+    }
 
     // Check permissions
     LaunchedEffect(Unit) {
@@ -85,7 +123,7 @@ fun DashboardScreen(
                 onLocationUpdate = { location ->
                     coroutineScope.launch {
                         currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
-                        speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
+                        //speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
                         compassDirection = getCompassDirection(location.bearing)
                     }
                 }
@@ -110,14 +148,7 @@ fun DashboardScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             // Current Speed
-            /*
-            Text(
-                text = speed,
-                fontSize = 48.sp,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
 
-             */
             SpeedDisplay(speed)
 
             // Distance Information
