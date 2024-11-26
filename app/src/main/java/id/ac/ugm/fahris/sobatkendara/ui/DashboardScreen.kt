@@ -3,11 +3,13 @@ package id.ac.ugm.fahris.sobatkendara.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerState
@@ -20,24 +22,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 import com.google.android.gms.location.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import id.ac.ugm.fahris.sobatkendara.service.GeocodingApiService
 
 
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
+import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -48,7 +53,7 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     var currentLocation by rememberSaveable { mutableStateOf("Fetching location...") }
-    var speed by rememberSaveable { mutableStateOf("0 km/h") }
+    var speed by rememberSaveable { mutableStateOf("0") }
     var distance by rememberSaveable { mutableStateOf("0.0 km") }
     var timeElapsed by rememberSaveable { mutableStateOf("00:00:00") }
     var compassDirection by rememberSaveable { mutableStateOf("N") }
@@ -62,6 +67,8 @@ fun DashboardScreen(
     )
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    val geocodingApi = remember { GeocodingApiService.create() }
+    val coroutineScope = rememberCoroutineScope()
 
     // Check permissions
     LaunchedEffect(Unit) {
@@ -76,9 +83,11 @@ fun DashboardScreen(
             startLocationUpdates(
                 fusedLocationClient = fusedLocationClient,
                 onLocationUpdate = { location ->
-                    currentLocation = getAddressFromLocation(context, location)
-                    speed = "${(location.speed * 3.6).roundToInt()} km/h" // Convert m/s to km/h
-                    compassDirection = getCompassDirection(location.bearing)
+                    coroutineScope.launch {
+                        currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
+                        speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
+                        compassDirection = getCompassDirection(location.bearing)
+                    }
                 }
             )
         }
@@ -89,22 +98,27 @@ fun DashboardScreen(
     ) {
 
         Column(
-            modifier = Modifier.fillMaxSize().padding(it),
+            modifier = Modifier.fillMaxSize().padding(it).padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Current Location
             Text(
                 text = currentLocation,
-                fontSize = 18.sp,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             // Current Speed
+            /*
             Text(
                 text = speed,
                 fontSize = 48.sp,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
+
+             */
+            SpeedDisplay(speed)
 
             // Distance Information
             Text(
@@ -129,7 +143,30 @@ fun DashboardScreen(
 
     }
 }
+@Preview
+@Composable
+fun DashboardScreenPreview() {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    DashboardScreen(drawerState)
+}
 
+@Composable
+fun SpeedDisplay(speed: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(16.dp)
+    ) {
+        Text(
+            text = speed,
+            fontSize = 96.sp, // Large font size for the speed number
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        Text(
+            text = "km/h",
+            fontSize = 16.sp // Smaller font size for "km/h"
+        )
+    }
+}
 // Function to start location updates
 @SuppressLint("MissingPermission")
 fun startLocationUpdates(
@@ -137,14 +174,6 @@ fun startLocationUpdates(
     onLocationUpdate: (Location) -> Unit
 ) {
     val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000).setMinUpdateIntervalMillis(1000).build()
-/*
-    val locationRequest = LocationRequest.
-    create().apply {
-        interval = 2000
-        fastestInterval = 1000
-        priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-    }
- */
 
     val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
@@ -158,15 +187,49 @@ fun startLocationUpdates(
     fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
 }
 
+suspend fun getAddressFromLocation(context: Context, location: Location, geocodingApi: GeocodingApiService, isGoogleAPI: Boolean = false): String {
+    if (isGoogleAPI) {
+        return getAddressFromGoogleApi(context, location, geocodingApi)
+    } else {
+        return getAddressFromGeocoder(context, location)
+    }
+}
 // Function to get a human-readable address from a location
-fun getAddressFromLocation(context: Context, location: Location): String {
+fun getAddressFromGeocoder(context: Context, location: Location): String {
     val geocoder = Geocoder(context, Locale.getDefault())
     return try {
         val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-        addresses?.firstOrNull()?.featureName ?: "Unknown location"
+        //addresses?.firstOrNull()?.featureName ?: "Unknown location"
+        val province = addresses?.firstOrNull()?.adminArea?:""
+        val feature = addresses?.firstOrNull()?.featureName?:""
+        val subLocality = addresses?.firstOrNull()?.subLocality?:""
+        val thoroughfare = addresses?.firstOrNull()?.thoroughfare?:""
+        val subThoroughfare = addresses?.firstOrNull()?.subThoroughfare?:""
+        //addresses?.firstOrNull()?.thoroughfare ?: "Unknown location"
+        "$province\n $feature $subLocality $thoroughfare $subThoroughfare"
     } catch (e: Exception) {
         Log.d("DashboardScreen", "error: ${e.message}")
         return "Unknown location"
+    }
+}
+suspend fun getAddressFromGoogleApi(
+    context: Context,
+    location: Location,
+    geocodingApi: GeocodingApiService
+): String {
+    return try {
+        val latitude = location.latitude
+        val longitude = location.longitude
+        val metadata = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA).metaData
+        val googleApiKey = metadata.getString("com.google.android.geo.API_KEY")
+        val response = geocodingApi.getAddress("$latitude,$longitude", googleApiKey?:"")
+        if (response.status == "OK" && response.results.isNotEmpty()) {
+            response.results.first().formatted_address
+        } else {
+            "Unknown location"
+        }
+    } catch (e: Exception) {
+        "Error fetching location"
     }
 }
 
@@ -184,9 +247,3 @@ fun getCompassDirection(bearing: Float): String {
     }
 }
 
-@Preview
-@Composable
-fun DashboardScreenPreview() {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    DashboardScreen(drawerState)
-}
