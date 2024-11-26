@@ -8,7 +8,9 @@ import android.location.Geocoder
 import android.location.Location
 import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -54,6 +57,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import id.ac.ugm.fahris.sobatkendara.R
 import id.ac.ugm.fahris.sobatkendara.service.GeocodingApiService
+import id.ac.ugm.fahris.sobatkendara.ui.components.AmbientLightMonitor
 
 
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
@@ -78,6 +82,8 @@ fun DashboardScreen(
     var compassDirection by rememberSaveable { mutableStateOf("N") }
     var compassBearing by rememberSaveable { mutableStateOf(0f) }
     var isPermissionGranted by remember { mutableStateOf(false) }
+    var isShowHeadlightAlert by rememberSaveable { mutableStateOf(false)}
+    var isShowDrowsinessAlert by rememberSaveable { mutableStateOf(false)}
 
     var isJourneyActive by rememberSaveable { mutableStateOf(false) }
 
@@ -147,6 +153,23 @@ fun DashboardScreen(
                 }
             }
         }
+        val ambientLightMonitor = remember {
+            AmbientLightMonitor(
+                context = context,
+                lowLightThreshold = 10.0f, // Adjust threshold as needed
+                durationThreshold = 5000L // 5 seconds
+            )
+        }
+        // Start and stop ambient light monitoring
+        DisposableEffect(Unit) {
+            ambientLightMonitor.start { warningState ->
+                Log.d("DashboardScreen", "Warning state changed: $warningState")
+                isShowHeadlightAlert = warningState
+            }
+            onDispose {
+                ambientLightMonitor.stop()
+            }
+        }
     }
 
     // Check permissions
@@ -182,6 +205,39 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Warning Text
+            if (isShowHeadlightAlert) {
+                Box(
+                    modifier = Modifier.padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = 16.dp
+                    ).background(Color.Red)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        //modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+
+                        ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_carlight_white_24dp),
+                            contentDescription = "Car Light",
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp).size(24.dp)
+                        )
+                        Text(
+                            text = "Please switch on your headlights!",
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+
+                            color = Color.White,
+                            modifier = Modifier.padding(end = 16.dp),
+
+                            )
+                    }
+                }
+            }
             // Current Location
             Text(
                 text = currentLocation,
@@ -280,7 +336,7 @@ fun startLocationUpdates(
         override fun onLocationResult(locationResult: LocationResult) {
             val loc = locationResult.lastLocation
 
-            Log.d("DashboardScreen", "onLocationResult ${loc.toString()}")
+            //Log.d("DashboardScreen", "onLocationResult ${loc.toString()}")
             locationResult.lastLocation?.let(onLocationUpdate)
         }
     }
