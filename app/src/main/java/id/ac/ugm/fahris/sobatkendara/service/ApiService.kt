@@ -1,6 +1,7 @@
 package id.ac.ugm.fahris.sobatkendara.service
 
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -431,8 +432,6 @@ object ApiService {
 
                 httpsURLConnection.requestMethod = "GET"
                 httpsURLConnection.setRequestProperty("Content-Type", "application/json")
-                httpsURLConnection.doOutput = true
-
                 httpsURLConnection.setRequestProperty("Authorization", "Bearer $token")
 
                 // Check the response code
@@ -445,10 +444,15 @@ object ApiService {
 
                     // Parse the JSON response to extract the token
                     val jsonResponse = JSONObject(response)
+                    Log.d("UserProfile", jsonResponse.toString())
+                    var additional_email = jsonResponse.getString("additional_email")
+                    if (additional_email == "null") {
+                        additional_email = ""
+                    }
                     return@withContext UserProfile(
                         id = jsonResponse.getInt("id"),
                         email = jsonResponse.getString("email"),
-                        additionalEmail = jsonResponse.getString("additional_email"),
+                        additionalEmail = additional_email,
                         timestampString = jsonResponse.getString("created_at")
                     )
                 } else {
@@ -490,10 +494,9 @@ object ApiService {
                 }
 
                 httpsURLConnection.requestMethod = "PUT"
+                httpsURLConnection.setRequestProperty("Authorization", "Bearer $token")
                 httpsURLConnection.setRequestProperty("Content-Type", "application/json")
                 httpsURLConnection.doOutput = true
-
-                httpsURLConnection.setRequestProperty("Authorization", "Bearer $token")
 
                 // Create the JSON request body
                 val jsonInputString = JSONObject()
@@ -515,11 +518,13 @@ object ApiService {
 
                     // Parse the JSON response to extract the token
                     val jsonResponse = JSONObject(response)
+                    Log.d("UserProfile", jsonResponse.toString())
+                    val jsonUser = jsonResponse.getJSONObject("user")
                     return@withContext UserProfile(
-                        id = jsonResponse.getInt("id"),
-                        email = jsonResponse.getString("email"),
-                        additionalEmail = jsonResponse.getString("additional_email"),
-                        timestampString = jsonResponse.getString("created_at")
+                        id = jsonUser.getInt("id"),
+                        email = jsonUser.getString("email"),
+                        additionalEmail = jsonUser.getString("additional_email"),
+                        timestampString = jsonUser.getString("created_at")
                     )
                 } else {
                     val reader = BufferedReader(InputStreamReader(httpsURLConnection.errorStream))

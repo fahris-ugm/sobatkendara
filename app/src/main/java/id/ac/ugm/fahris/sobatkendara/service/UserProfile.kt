@@ -8,11 +8,11 @@ import java.util.TimeZone
 data class UserProfile(
     val id: Int,
     val email: String,
-    val additionalEmail: String,
+    val additionalEmail: String?,
     val createdAt: Date
 ) {
     // Alternate constructor
-    constructor(id: Int, email: String, additionalEmail: String, timestampString: String) : this(
+    constructor(id: Int, email: String, additionalEmail: String?, timestampString: String) : this(
         id,
         email,
         additionalEmail,
