@@ -7,11 +7,13 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Scaffold
@@ -28,8 +30,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,6 +47,7 @@ import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import id.ac.ugm.fahris.sobatkendara.R
 import id.ac.ugm.fahris.sobatkendara.service.GeocodingApiService
 
 
@@ -65,6 +71,7 @@ fun DashboardScreen(
     var distance by rememberSaveable { mutableStateOf("0.0 km") }
     var timeElapsed by rememberSaveable { mutableStateOf("00:00:00") }
     var compassDirection by rememberSaveable { mutableStateOf("N") }
+    var compassBearing by rememberSaveable { mutableStateOf(0f) }
     var isPermissionGranted by remember { mutableStateOf(false) }
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
@@ -125,6 +132,7 @@ fun DashboardScreen(
                         currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
                         //speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
                         compassDirection = getCompassDirection(location.bearing)
+                        compassBearing = 360 - location.bearing
                     }
                 }
             )
@@ -165,10 +173,17 @@ fun DashboardScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
+
             // Compass Direction
             Text(
-                text = "Direction: $compassDirection",
+                text = "$compassDirection",
                 fontSize = 24.sp
+            )
+            Image(
+                painter = painterResource(id = R.drawable.ic_compass_rect),
+                contentDescription = "compass",
+                modifier = Modifier.padding(bottom = 16.dp, start = 32.dp, end = 32.dp).size(120.dp).rotate(compassBearing),
+                contentScale = ContentScale.Fit
             )
         }
 
