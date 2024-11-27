@@ -61,6 +61,7 @@ import id.ac.ugm.fahris.sobatkendara.ui.components.AmbientLightMonitor
 
 
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
+import id.ac.ugm.fahris.sobatkendara.ui.components.DrowsinessDetector
 import id.ac.ugm.fahris.sobatkendara.ui.components.FusionSpeedCalculator
 import id.ac.ugm.fahris.sobatkendara.ui.components.SpeedCalculator
 import kotlinx.coroutines.delay
@@ -127,6 +128,33 @@ fun DashboardScreen(
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
+
+    }
+
+    // Check permissions
+    LaunchedEffect(Unit) {
+        isPermissionGranted = permissionState.allPermissionsGranted
+        if (!isPermissionGranted) {
+            permissionState.launchMultiplePermissionRequest()
+        }
+    }
+    // Start listening for location updates if permission is granted
+    LaunchedEffect(isPermissionGranted) {
+        if (isPermissionGranted) {
+            startLocationUpdates(
+                fusedLocationClient = fusedLocationClient,
+                onLocationUpdate = { location ->
+                    coroutineScope.launch {
+                        currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
+                        //speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
+                        compassDirection = getCompassDirection(location.bearing)
+                        compassBearing = 360 - location.bearing
+                    }
+                }
+            )
+        }
+    }
+    if (!isInspection) {
         //val speedCalculator = remember { SpeedCalculator(context) }
         val speedCalculator = remember { FusionSpeedCalculator(context) }
         // Start and stop speed calculation
@@ -170,34 +198,24 @@ fun DashboardScreen(
                 ambientLightMonitor.stop()
             }
         }
-    }
+        /*
+        TODO
+        val drowsinessDetector = remember { DrowsinessDetector() }
+        // Start and stop drowsiness detection
+        DisposableEffect(Unit) {
+            drowsinessDetector.start { isDrowsy ->
+                isShowDrowsinessAlert = isDrowsy
+            }
+            onDispose {
+                drowsinessDetector.stop()
+            }
+        }
 
-    // Check permissions
-    LaunchedEffect(Unit) {
-        isPermissionGranted = permissionState.allPermissionsGranted
-        if (!isPermissionGranted) {
-            permissionState.launchMultiplePermissionRequest()
-        }
-    }
-    // Start listening for location updates if permission is granted
-    LaunchedEffect(isPermissionGranted) {
-        if (isPermissionGranted) {
-            startLocationUpdates(
-                fusedLocationClient = fusedLocationClient,
-                onLocationUpdate = { location ->
-                    coroutineScope.launch {
-                        currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
-                        //speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
-                        compassDirection = getCompassDirection(location.bearing)
-                        compassBearing = 360 - location.bearing
-                    }
-                }
-            )
-        }
+         */
     }
 
     Scaffold(
-        topBar = { AppBar(drawerState = drawerState,title = R.string.app_name) }
+        topBar = { AppBar(drawerState = drawerState, title = R.string.app_name) }
     ) {
 
         Column(
@@ -209,10 +227,10 @@ fun DashboardScreen(
             if (isShowHeadlightAlert) {
                 Box(
                     modifier = Modifier.padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 16.dp,
-                        bottom = 16.dp
+                        start = 4.dp,
+                        end = 4.dp,
+                        top = 4.dp,
+                        bottom = 4.dp
                     ).background(Color.Red)
                 ) {
                     Row(
@@ -238,6 +256,40 @@ fun DashboardScreen(
                     }
                 }
             }
+
+            if (isShowDrowsinessAlert) {
+                Box(
+                    modifier = Modifier.padding(
+                        start = 4.dp,
+                        end = 4.dp,
+                        top = 4.dp,
+                        bottom = 4.dp
+                    ).background(Color.Red)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        //modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+
+                        ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_sleep_white_24dp),
+                            contentDescription = "Car Light",
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 2.dp, bottom = 2.dp).size(24.dp)
+                        )
+                        Text(
+                            text = "Drowsiness detected! Please take a break.",
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+
+                            color = Color.White,
+                            modifier = Modifier.padding(end = 16.dp),
+
+                            )
+                    }
+                }
+            }
+
             // Current Location
             Text(
                 text = currentLocation,
