@@ -93,7 +93,8 @@ fun DashboardScreen(
 ) {
 
     val context = LocalContext.current
-    var currentLocation by rememberSaveable { mutableStateOf("Fetching location...") }
+    var currentLocation by rememberSaveable { mutableStateOf(Location("")) }
+    var currentLocationText by rememberSaveable { mutableStateOf("Fetching location...") }
     var speed by rememberSaveable { mutableStateOf("0") }
     var distance by rememberSaveable { mutableStateOf("0.0") }
     var timeElapsed by rememberSaveable { mutableStateOf("00:00:00") }
@@ -131,17 +132,19 @@ fun DashboardScreen(
             timeElapsed = formatElapsedTime(elapsedTime)
         }
     }
-    fun sendAlert() {
+    fun sendAlert(soundThreshold: Double = 0.0, soundValue: Double = 0.0, shakeThreshold: Double = 0.0, shakeValue: Double = 0.0) {
         coroutineScope.launch {
             val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
             val token = sharedPreferences.getString("auth_token", null)
+            val location = currentLocation.latitude.toString() + "," + currentLocation.longitude.toString()
+            Log.d("DashboardScreen", "soundThreshold: $soundThreshold, soundValue: $soundValue, shakeThreshold: $shakeThreshold, shakeValue: $shakeValue, location: $location")
             val alert = AlertRequest(
                 Date(),
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                "unknown"
+                soundThreshold,
+                soundValue,
+                shakeThreshold,
+                shakeValue,
+                location
             )
 
             ApiService.sendAlert(context, token?:"", alert, onSendAlertError = {message ->
@@ -183,8 +186,9 @@ fun DashboardScreen(
             startLocationUpdates(
                 fusedLocationClient = fusedLocationClient,
                 onLocationUpdate = { location ->
+                    currentLocation = location
                     coroutineScope.launch {
-                        currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
+                        currentLocationText = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
                         // Delegated to FusionSpeedCalculator
                         //speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
                         // Delegated to DirectionCalculator
@@ -273,7 +277,8 @@ fun DashboardScreen(
                     }
                 },
                 onAccidentDetected = {
-                    sendAlert()
+                    threshold, value ->
+                    sendAlert(soundThreshold = threshold, soundValue = value)
                 }
             )
             onDispose {
@@ -286,8 +291,9 @@ fun DashboardScreen(
         // Start and stop accident detection
         DisposableEffect(Unit) {
             accidentDetector.start {
+                threshold, value ->
                 // Accident detected
-                sendAlert()
+                sendAlert(shakeThreshold = threshold, shakeValue = value)
             }
             onDispose {
                 accidentDetector.stop()
@@ -381,7 +387,7 @@ fun DashboardScreen(
 
             // Current Location
             Text(
-                text = currentLocation,
+                text = currentLocationText,
                 fontSize = 14.sp,
                 minLines = 3,
                 textAlign = TextAlign.Center,

@@ -22,9 +22,9 @@ class AccidentDetector(
     private var lastAccidentTime = 0L
     private val accidentDurationThreshold = 1000L * 60 * 60 // 1 hour
 
-    private var onAccidentDetected: (() -> Unit)? = null
+    private var onAccidentDetected: ((threshold: Double, value: Double) -> Unit)? = null
 
-    fun start(onAccidentDetected: () -> Unit) {
+    fun start(onAccidentDetected: (threshold: Double, value: Double) -> Unit) {
         this.onAccidentDetected = onAccidentDetected
         accelerometer?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
@@ -45,23 +45,23 @@ class AccidentDetector(
             Sensor.TYPE_LINEAR_ACCELERATION -> {
                 val magnitude = event.values.map { it * it }.sum().let { Math.sqrt(it.toDouble()) }
                 if (magnitude > accelerationThreshold) {
-                    processAccident()
+                    processAccident(accelerationThreshold.toDouble(), magnitude)
                 }
             }
             Sensor.TYPE_GYROSCOPE -> {
                 val angularVelocity = event.values.map { it * it }.sum().let { Math.sqrt(it.toDouble()) }
                 if (angularVelocity > angularVelocityThreshold) {
-                    processAccident()
+                    processAccident(angularVelocityThreshold.toDouble(), angularVelocity)
                 }
             }
         }
     }
-    private fun processAccident() {
+    private fun processAccident(threshold: Double, value: Double) {
         Log.d("AccidentDetector", "Accident detected!")
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastAccidentTime >= accidentDurationThreshold) {
             lastAccidentTime = currentTime
-            onAccidentDetected?.invoke()
+            onAccidentDetected?.invoke(threshold, value)
         }
     }
 

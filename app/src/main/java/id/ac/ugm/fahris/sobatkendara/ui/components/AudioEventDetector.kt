@@ -25,11 +25,13 @@ class AudioEventDetector(
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
     private var onDrowsinessChanged: ((Boolean) -> Unit)? = null
+    private var onAccidentDetected: ((threshold: Double, value: Double) -> Unit)? = null
 
     // Start capturing audio
     @SuppressLint("MissingPermission")
-    fun start(onDrowsinessChanged: (Boolean) -> Unit, onAccidentDetected: () -> Unit) {
+    fun start(onDrowsinessChanged: (Boolean) -> Unit, onAccidentDetected: (threshold: Double, value: Double) -> Unit) {
         this.onDrowsinessChanged = onDrowsinessChanged
+        this.onAccidentDetected = onAccidentDetected
         val bufferSize = AudioRecord.getMinBufferSize(
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
@@ -58,7 +60,7 @@ class AudioEventDetector(
                         if (maxAmplitude > accidentThreshold) {
                             if (currentTime - lastAccidentTime >= accidentDurationThreshold) {
                                 lastAccidentTime = currentTime
-                                onAccidentDetected.invoke()
+                                onAccidentDetected.invoke(accidentThreshold.toDouble(), maxAmplitude.toDouble())
                             }
 
                         }
