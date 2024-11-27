@@ -10,8 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class DrowsinessDetector(
-    private val silenceThreshold: Int = 3000, // Adjust based on audio amplitude
+class AudioEventDetector(
+    private val accidentThreshold: Int = 20000,
+    private val silenceThreshold: Int = 300, // Adjust based on audio amplitude
     private val silenceDurationThreshold: Long = 5000L, // 5 seconds of silence
     private val awakeDurationThreshold: Long = 2000L, // 5 seconds of silence
     private val sampleRate: Int = 44100
@@ -19,13 +20,15 @@ class DrowsinessDetector(
     private var isDrowsy = false
     private var lastActiveTime = 0L //System.currentTimeMillis()
     private var lastSilenceTime = 0L
+    private var lastAccidentTime = 0L
+    private val accidentDurationThreshold = 1000L * 60 * 60 // 1 hour
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
     private var onDrowsinessChanged: ((Boolean) -> Unit)? = null
 
     // Start capturing audio
     @SuppressLint("MissingPermission")
-    fun start(onDrowsinessChanged: (Boolean) -> Unit) {
+    fun start(onDrowsinessChanged: (Boolean) -> Unit, onAccidentDetected: () -> Unit) {
         this.onDrowsinessChanged = onDrowsinessChanged
         val bufferSize = AudioRecord.getMinBufferSize(
             sampleRate,
@@ -46,14 +49,19 @@ class DrowsinessDetector(
 
             CoroutineScope(Dispatchers.IO).launch {
                 val buffer = ShortArray(bufferSize)
-                //var lastSoundTime = System.currentTimeMillis()
                 while (isRecording) {
-
                     val readSize = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (readSize > 0) {
                         val currentTime = System.currentTimeMillis()
                         val maxAmplitude = buffer.take(readSize).map { kotlin.math.abs(it.toInt()) }.maxOrNull() ?: 0
                         //Log.d("DrowsinessDetector", "Max Amplitude: $maxAmplitude")
+                        if (maxAmplitude > accidentThreshold) {
+                            if (currentTime - lastAccidentTime >= accidentDurationThreshold) {
+                                lastAccidentTime = currentTime
+                                onAccidentDetected.invoke()
+                            }
+
+                        }
                         if (maxAmplitude < silenceThreshold) {
                             lastActiveTime = 0L
                             if (lastSilenceTime == 0L) {

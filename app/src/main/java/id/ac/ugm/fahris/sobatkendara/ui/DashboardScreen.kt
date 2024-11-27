@@ -79,9 +79,8 @@ import id.ac.ugm.fahris.sobatkendara.ui.components.AmbientLightMonitor
 
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
 import id.ac.ugm.fahris.sobatkendara.ui.components.DirectionCalculator
-import id.ac.ugm.fahris.sobatkendara.ui.components.DrowsinessDetector
+import id.ac.ugm.fahris.sobatkendara.ui.components.AudioEventDetector
 import id.ac.ugm.fahris.sobatkendara.ui.components.FusionSpeedCalculator
-import id.ac.ugm.fahris.sobatkendara.ui.components.SpeedCalculator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -110,7 +109,7 @@ fun DashboardScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val geocodingApi = remember { GeocodingApiService.create() }
     val coroutineScope = rememberCoroutineScope()
-    val drowsinessDetector = remember { DrowsinessDetector() }
+    val audioEventDetector = remember { AudioEventDetector() }
 
     // wrapper to handle bug of android studio failed to render permissions, sensormanager
     val isInspection = LocalInspectionMode.current
@@ -131,6 +130,25 @@ fun DashboardScreen(
             elapsedTime += 1000
             timeElapsed = formatElapsedTime(elapsedTime)
         }
+    }
+    fun sendAlert() {
+        coroutineScope.launch {
+            val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+            val token = sharedPreferences.getString("auth_token", null)
+            val alert = AlertRequest(
+                Date(),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                "unknown"
+            )
+
+            ApiService.sendAlert(context, token?:"", alert, onSendAlertError = {message ->
+                Toast.makeText(context, "Failed to send alert: $message", Toast.LENGTH_SHORT).show()
+            })
+        }
+        isShowAccidentDialog = true
     }
 
     if (isInspection) {
@@ -238,24 +256,30 @@ fun DashboardScreen(
 
         // Start and stop drowsiness detection
         DisposableEffect(Unit) {
-            drowsinessDetector.start { isDrowsy ->
-                isShowDrowsinessAlert = isDrowsy
-                if (isDrowsy) {
-                    playAlarm(context)
-                    startVoiceRecognition(context) {
-                        // Stop the alarm
-                        isShowDrowsinessAlert = false
-                        drowsinessDetector.setIsDrowsy(false)
+            audioEventDetector.start(
+                onDrowsinessChanged = { isDrowsy ->
+                    isShowDrowsinessAlert = isDrowsy
+                    if (isDrowsy) {
+                        playAlarm(context)
+                        startVoiceRecognition(context) {
+                            // Stop the alarm
+                            isShowDrowsinessAlert = false
+                            audioEventDetector.setIsDrowsy(false)
+                            stopAlarm()
+                        }
+                    } else {
+                        audioEventDetector.setIsDrowsy(false)
                         stopAlarm()
                     }
-                } else {
-                    drowsinessDetector.setIsDrowsy(false)
-                    stopAlarm()
+                },
+                onAccidentDetected = {
+                    sendAlert()
                 }
-            }
+            )
             onDispose {
-                drowsinessDetector.stop()
+                audioEventDetector.stop()
             }
+
         }
 
         val accidentDetector = remember { AccidentDetector(context) }
@@ -263,23 +287,7 @@ fun DashboardScreen(
         DisposableEffect(Unit) {
             accidentDetector.start {
                 // Accident detected
-                coroutineScope.launch {
-                    val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
-                    val token = sharedPreferences.getString("auth_token", null)
-                    val alert: AlertRequest = AlertRequest(
-                        Date(),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        "unknown"
-                    )
-
-                    ApiService.sendAlert(context, token?:"", alert, onSendAlertError = {message ->
-                        Toast.makeText(context, "Failed to send alert: $message", Toast.LENGTH_SHORT).show()
-                    })
-                }
-                isShowAccidentDialog = true
+                sendAlert()
             }
             onDispose {
                 accidentDetector.stop()
@@ -344,7 +352,7 @@ fun DashboardScreen(
                         bottom = 4.dp
                     ).background(Color.Red).clickable {
                         isShowDrowsinessAlert = false
-                        drowsinessDetector.setIsDrowsy(false)
+                        audioEventDetector.setIsDrowsy(false)
                         stopAlarm()
                     }
                 ) {
