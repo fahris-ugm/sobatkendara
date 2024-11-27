@@ -93,6 +93,8 @@ fun DashboardScreen(
 ) {
 
     val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+
     var currentLocation by rememberSaveable { mutableStateOf(Location("")) }
     var currentLocationText by rememberSaveable { mutableStateOf("Fetching location...") }
     var speed by rememberSaveable { mutableStateOf("0") }
@@ -134,7 +136,7 @@ fun DashboardScreen(
     }
     fun sendAlert(soundThreshold: Double = 0.0, soundValue: Double = 0.0, shakeThreshold: Double = 0.0, shakeValue: Double = 0.0) {
         coroutineScope.launch {
-            val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+
             val token = sharedPreferences.getString("auth_token", null)
             val location = currentLocation.latitude.toString() + "," + currentLocation.longitude.toString()
             Log.d("DashboardScreen", "soundThreshold: $soundThreshold, soundValue: $soundValue, shakeThreshold: $shakeThreshold, shakeValue: $shakeValue, location: $location")
@@ -170,7 +172,6 @@ fun DashboardScreen(
                 Manifest.permission.RECORD_AUDIO
             )
         )
-
     }
 
     // Check permissions
@@ -239,31 +240,35 @@ fun DashboardScreen(
             }
         }
 
-        val ambientLightMonitor = remember {
-            AmbientLightMonitor(
-                context = context,
-                lowLightThreshold = 10.0f, // Adjust threshold as needed
-                durationThreshold = 5000L // 5 seconds
-            )
-        }
-        // Start and stop ambient light monitoring
-        DisposableEffect(Unit) {
-            ambientLightMonitor.start { warningState ->
-                Log.d("DashboardScreen", "Warning state changed: $warningState")
-                isShowHeadlightAlert = warningState
+        val flagHeadlightAlert = sharedPreferences.getBoolean("flag_headlight_alert", true)
+        if (flagHeadlightAlert) {
+            val ambientLightMonitor = remember {
+                AmbientLightMonitor(
+                    context = context,
+                    lowLightThreshold = 10.0f, // Adjust threshold as needed
+                    durationThreshold = 5000L // 5 seconds
+                )
             }
-            onDispose {
-                ambientLightMonitor.stop()
+            // Start and stop ambient light monitoring
+            DisposableEffect(Unit) {
+                ambientLightMonitor.start { warningState ->
+                    Log.d("DashboardScreen", "Warning state changed: $warningState")
+                    isShowHeadlightAlert = warningState
+                }
+                onDispose {
+                    ambientLightMonitor.stop()
+                }
             }
         }
 
-
+        val flagDrowsinessAlert = sharedPreferences.getBoolean("flag_drowsiness_alert", true)
+        val flagAccidentAudioAlert = sharedPreferences.getBoolean("flag_accident_audio_alert", true)
         // Start and stop drowsiness detection
         DisposableEffect(Unit) {
             audioEventDetector.start(
                 onDrowsinessChanged = { isDrowsy ->
                     isShowDrowsinessAlert = isDrowsy
-                    if (isDrowsy) {
+                    if (isDrowsy && flagDrowsinessAlert) {
                         playAlarm(context)
                         startVoiceRecognition(context) {
                             // Stop the alarm
@@ -277,8 +282,10 @@ fun DashboardScreen(
                     }
                 },
                 onAccidentDetected = {
-                    threshold, value ->
-                    sendAlert(soundThreshold = threshold, soundValue = value)
+                        threshold, value ->
+                    if (flagAccidentAudioAlert) {
+                        sendAlert(soundThreshold = threshold, soundValue = value)
+                    }
                 }
             )
             onDispose {
@@ -287,16 +294,20 @@ fun DashboardScreen(
 
         }
 
-        val accidentDetector = remember { AccidentDetector(context) }
-        // Start and stop accident detection
-        DisposableEffect(Unit) {
-            accidentDetector.start {
-                threshold, value ->
-                // Accident detected
-                sendAlert(shakeThreshold = threshold, shakeValue = value)
-            }
-            onDispose {
-                accidentDetector.stop()
+
+        val flagAccidentMovementAlert = sharedPreferences.getBoolean("flag_accident_movement_alert", true)
+        if (flagAccidentMovementAlert) {
+            val accidentDetector = remember { AccidentDetector(context) }
+            // Start and stop accident detection
+            DisposableEffect(Unit) {
+                accidentDetector.start {
+                        threshold, value ->
+                    // Accident detected
+                    sendAlert(shakeThreshold = threshold, shakeValue = value)
+                }
+                onDispose {
+                    accidentDetector.stop()
+                }
             }
         }
     }
@@ -310,8 +321,6 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-
             if (isShowAccidentDialog) {
                 AccidentWarningDialog { isShowAccidentDialog = false }
             }

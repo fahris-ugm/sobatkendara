@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -43,6 +45,11 @@ fun ConfigScreen(
     var notificationEmail by rememberSaveable { mutableStateOf( "") }
     var isEmailDialogOpen by rememberSaveable { mutableStateOf(false) }
 
+    var flagHeadlightAlert by rememberSaveable { mutableStateOf(false) }
+    var flagDrowsinessAlert by rememberSaveable { mutableStateOf(false) }
+    var flagAccidentMovementAlert by rememberSaveable { mutableStateOf(false) }
+    var flagAccidentAudioAlert by rememberSaveable { mutableStateOf(false) }
+
     var headlightThreshold by rememberSaveable { mutableStateOf(50f) }
     var drowsinessThreshold by rememberSaveable { mutableStateOf(50f) }
     var accidentShakinessThreshold by rememberSaveable { mutableStateOf(50f) }
@@ -50,12 +57,17 @@ fun ConfigScreen(
     var isLoading by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
 
     // Fetch profile data when the screen is shown
     LaunchedEffect(Unit) {
         isLoading = true
-        val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
         val token = sharedPreferences.getString("auth_token", null)
+        flagHeadlightAlert = sharedPreferences.getBoolean("flag_headlight_alert", true)
+        flagDrowsinessAlert = sharedPreferences.getBoolean("flag_drowsiness_alert", true)
+        flagAccidentMovementAlert = sharedPreferences.getBoolean("flag_accident_movement_alert", true)
+        flagAccidentAudioAlert = sharedPreferences.getBoolean("flag_accident_audio_alert", true)
+
         val profile = ApiService.getProfile(context, token?:"", onGetProfileError = {message ->
             Toast.makeText(context, "Failed to get profile: $message", Toast.LENGTH_SHORT).show()
         })
@@ -74,7 +86,9 @@ fun ConfigScreen(
         }
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(it).padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(it).padding(16.dp).verticalScroll(
+                rememberScrollState()
+            ),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.Start
         ) {
@@ -132,7 +146,26 @@ fun ConfigScreen(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
-
+            FeatureSwitch("Headlight Alert", flagHeadlightAlert) {
+                flagHeadlightAlert = it
+                sharedPreferences.edit().putBoolean("flag_headlight_alert", it).apply()
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            FeatureSwitch("Drowsiness Alert", flagDrowsinessAlert) {
+                flagDrowsinessAlert = it
+                sharedPreferences.edit().putBoolean("flag_drowsiness_alert", it).apply()
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            FeatureSwitch("Accident Movement Alert", flagAccidentMovementAlert) {
+                flagAccidentMovementAlert = it
+                sharedPreferences.edit().putBoolean("flag_accident_movement_alert", it).apply()
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            FeatureSwitch("Accident Audio Alert", flagAccidentAudioAlert) {
+                flagAccidentAudioAlert = it
+                sharedPreferences.edit().putBoolean("flag_accident_audio_alert", it).apply()
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             // Sliders for thresholds
             ThresholdSlider(
                 label = "Headlight Threshold",
@@ -169,6 +202,25 @@ fun ThresholdSlider(label: String, value: Float, onValueChange: (Float) -> Unit)
         valueRange = 0f..100f,
         modifier = Modifier.padding(vertical = 8.dp)
     )
+}
+
+@Composable
+fun FeatureSwitch(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            fontSize = 18.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.padding(start = 8.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
 }
 
 @Composable
