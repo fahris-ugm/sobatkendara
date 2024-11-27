@@ -3,14 +3,24 @@ package id.ac.ugm.fahris.sobatkendara.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
-import android.util.JsonToken
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +78,7 @@ import id.ac.ugm.fahris.sobatkendara.ui.components.AmbientLightMonitor
 
 
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
+import id.ac.ugm.fahris.sobatkendara.ui.components.DirectionCalculator
 import id.ac.ugm.fahris.sobatkendara.ui.components.DrowsinessDetector
 import id.ac.ugm.fahris.sobatkendara.ui.components.FusionSpeedCalculator
 import id.ac.ugm.fahris.sobatkendara.ui.components.SpeedCalculator
@@ -75,7 +86,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -100,6 +110,7 @@ fun DashboardScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val geocodingApi = remember { GeocodingApiService.create() }
     val coroutineScope = rememberCoroutineScope()
+    val drowsinessDetector = remember { DrowsinessDetector() }
 
     // wrapper to handle bug of android studio failed to render permissions, sensormanager
     val isInspection = LocalInspectionMode.current
@@ -134,7 +145,8 @@ fun DashboardScreen(
         permissionState = rememberMultiplePermissionsState(
             permissions = listOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.RECORD_AUDIO
             )
         )
 
@@ -155,9 +167,11 @@ fun DashboardScreen(
                 onLocationUpdate = { location ->
                     coroutineScope.launch {
                         currentLocation = getAddressFromLocation(context, location, geocodingApi = geocodingApi)
+                        // Delegated to FusionSpeedCalculator
                         //speed = "${(location.speed * 3.6).roundToInt()}" // Convert m/s to km/h
-                        compassDirection = getCompassDirection(location.bearing)
-                        compassBearing = 360 - location.bearing
+                        // Delegated to DirectionCalculator
+                        //compassDirection = getCompassDirection(location.bearing)
+                        //compassBearing = 360 - location.bearing
                     }
                 }
             )
@@ -190,6 +204,19 @@ fun DashboardScreen(
                 }
             }
         }
+
+        val directionCalculator = remember { DirectionCalculator(context) }
+        // Start and stop direction calculation
+        DisposableEffect(Unit) {
+            directionCalculator.start { direction ->
+                compassDirection = getCompassDirection(direction)
+                compassBearing = 360 - direction
+            }
+            onDispose {
+                directionCalculator.stop()
+            }
+        }
+
         val ambientLightMonitor = remember {
             AmbientLightMonitor(
                 context = context,
@@ -207,20 +234,30 @@ fun DashboardScreen(
                 ambientLightMonitor.stop()
             }
         }
-        /*
-        TODO
-        val drowsinessDetector = remember { DrowsinessDetector() }
+
+
         // Start and stop drowsiness detection
         DisposableEffect(Unit) {
             drowsinessDetector.start { isDrowsy ->
                 isShowDrowsinessAlert = isDrowsy
+                if (isDrowsy) {
+                    playAlarm(context)
+                    startVoiceRecognition(context) {
+                        // Stop the alarm
+                        isShowDrowsinessAlert = false
+                        drowsinessDetector.setIsDrowsy(false)
+                        stopAlarm()
+                    }
+                } else {
+                    drowsinessDetector.setIsDrowsy(false)
+                    stopAlarm()
+                }
             }
             onDispose {
                 drowsinessDetector.stop()
             }
         }
 
-         */
         val accidentDetector = remember { AccidentDetector(context) }
         // Start and stop accident detection
         DisposableEffect(Unit) {
@@ -305,11 +342,14 @@ fun DashboardScreen(
                         end = 4.dp,
                         top = 4.dp,
                         bottom = 4.dp
-                    ).background(Color.Red)
+                    ).background(Color.Red).clickable {
+                        isShowDrowsinessAlert = false
+                        drowsinessDetector.setIsDrowsy(false)
+                        stopAlarm()
+                    }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        //modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
 
                         ) {
@@ -379,7 +419,7 @@ fun DashboardScreen(
 
             // Compass Direction
             Text(
-                text = "$compassDirection",
+                text = compassDirection,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -509,4 +549,72 @@ fun AccidentWarningDialog(onDismiss: () -> Unit) {
             }
         }
     )
+}
+private var mediaPlayer: MediaPlayer? = null
+
+fun playAlarm(context: Context) {
+    Log.d("DashboardScreen", "playAlarm")
+    if (mediaPlayer == null) {
+        var alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        if (alert == null) {
+            alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            if (alert == null) {
+                alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            }
+        }
+        mediaPlayer = MediaPlayer()
+        mediaPlayer?.setAudioStreamType(AudioManager.STREAM_ALARM)
+        mediaPlayer?.setDataSource(context, alert)
+        mediaPlayer?.prepare()
+        mediaPlayer?.isLooping = true
+        mediaPlayer?.start()
+    }
+
+}
+fun stopAlarm() {
+    mediaPlayer?.let {
+        if (it.isPlaying) {
+            it.stop() // Stop playback
+            it.release() // Release resources
+        }
+    }
+    mediaPlayer = null // Reset the MediaPlayer instance
+}
+
+fun startVoiceRecognition(context: Context, onStopAlarm: () -> Unit) {
+    val mainHandler = Handler(Looper.getMainLooper())
+    mainHandler.post {
+        val speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+        }
+
+        speechRecognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                matches?.forEach {
+                    Log.d("DashboardScreen", "onResults: $it")
+                }
+                if (matches?.any { it.contains("awake", ignoreCase = true) } == true) {
+                    onStopAlarm() // Stop the alarm
+                }
+            }
+
+            // Implement other methods
+            override fun onError(error: Int) {
+                println("SpeechRecognizer error: $error")
+            }
+
+            override fun onBeginningOfSpeech() {}
+            override fun onEndOfSpeech() {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+        })
+
+        speechRecognizer.startListening(intent)
+    }
 }
