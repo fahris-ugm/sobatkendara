@@ -2,14 +2,22 @@ package id.ac.ugm.fahris.sobatkendara.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.nfc.NfcAdapter
+import android.nfc.Tag
+import android.nfc.tech.IsoDep
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +26,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,13 +85,14 @@ import id.ac.ugm.fahris.sobatkendara.service.GeocodingApiService
 import id.ac.ugm.fahris.sobatkendara.ui.components.AccidentDetector
 import id.ac.ugm.fahris.sobatkendara.ui.components.AmbientLightMonitor
 
-
 import id.ac.ugm.fahris.sobatkendara.ui.components.AppBar
 import id.ac.ugm.fahris.sobatkendara.ui.components.DirectionCalculator
 import id.ac.ugm.fahris.sobatkendara.ui.components.AudioEventDetector
 import id.ac.ugm.fahris.sobatkendara.ui.components.FusionSpeedCalculator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.Date
 import java.util.Locale
 
@@ -93,6 +103,7 @@ fun DashboardScreen(
 ) {
 
     val context = LocalContext.current
+    //val nfcAdapter = remember { NfcAdapter.getDefaultAdapter(context) }
     val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
 
     var currentLocation by rememberSaveable { mutableStateOf(Location("")) }
@@ -169,7 +180,8 @@ fun DashboardScreen(
             permissions = listOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.RECORD_AUDIO
+                Manifest.permission.RECORD_AUDIO,
+                //Manifest.permission.NFC
             )
         )
     }
@@ -200,7 +212,27 @@ fun DashboardScreen(
             )
         }
     }
+
     if (!isInspection) {
+        // NFC
+        /*
+        if (isPermissionGranted) {
+            DisposableEffect(Unit) {
+                if (nfcAdapter != null && nfcAdapter.isEnabled) {
+                    NFCReader(context) { cardBalance ->
+                        //balance = cardBalance
+                        Log.d("DashboardScreen", "cardBalance: $cardBalance")
+                        Toast.makeText(context, "Card Balance: $cardBalance", Toast.LENGTH_LONG).show()
+                    }
+                }
+                onDispose {
+
+                }
+            }
+
+        }
+
+         */
         //val speedCalculator = remember { SpeedCalculator(context) }
         val speedCalculator = remember { FusionSpeedCalculator(context) }
         // Start and stop speed calculation
@@ -649,4 +681,98 @@ fun startVoiceRecognition(context: Context, onStopAlarm: () -> Unit) {
 
         speechRecognizer.startListening(intent)
     }
+}
+
+fun Context.getActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.getActivity()
+    else -> null
+}
+
+fun NFCReader(context: Context, onBalanceRead: (String) -> Unit) {
+    val nfcAdapter = NfcAdapter.getDefaultAdapter(context)
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        Intent(context, context::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+    )
+
+    val intentFilter = arrayOf(
+        IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED),
+        IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED),
+        IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED)
+    )
+
+    val techList = arrayOf(
+        arrayOf(android.nfc.tech.IsoDep::class.java.name)
+    )
+
+    nfcAdapter?.enableForegroundDispatch(
+        context as Activity,
+        pendingIntent,
+        intentFilter,
+        techList
+    )
+
+    context.registerReceiver(object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context?, intent: Intent?) {
+            if (intent?.action == NfcAdapter.ACTION_TECH_DISCOVERED) {
+                val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+                tag?.let {
+                    val isoDep = IsoDep.get(it)
+                    isoDep?.let {
+                        try {
+                            isoDep.connect()
+                            val balance = readBalanceFromCard(isoDep)
+                            onBalanceRead(balance)
+                        } catch (e: Exception) {
+                            onBalanceRead("Error reading balance")
+                            e.printStackTrace()
+                        } finally {
+                            isoDep.close()
+                        }
+                    }
+                }
+            }
+        }
+    }, IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED))
+}
+
+fun readBalanceFromCard(isoDep: IsoDep): String {
+    // Example APDU Command to Select Application
+    val selectApplicationCommand = byteArrayOf(
+        0x00.toByte(), 0xA4.toByte(), 0x04.toByte(), 0x00.toByte(), 0x07.toByte(),
+        0xA0.toByte(), 0x00.toByte(), 0x00.toByte(), 0x06.toByte(), 0x47.toByte(), 0x2B.toByte(), 0x00.toByte()
+    )
+
+    val responseSelect = isoDep.transceive(selectApplicationCommand)
+    if (!isSuccessResponse(responseSelect)) {
+        return "Error: Failed to select application"
+    }
+
+    // Example APDU Command to Read Balance
+    val readBalanceCommand = byteArrayOf(
+        0x80.toByte(), 0x5C.toByte(), 0x00.toByte(), 0x02.toByte(), 0x04.toByte()
+    )
+
+    val responseBalance = isoDep.transceive(readBalanceCommand)
+    if (!isSuccessResponse(responseBalance)) {
+        return "Error: Failed to read balance"
+    }
+
+    // Parse balance (Assumes balance is in the first 4 bytes of response)
+    val balanceBytes = responseBalance.copyOfRange(0, 4)
+    //val balance = balanceBytes.toInt() / 100.0 // Example: Convert to currency
+    val balance = toInt32(balanceBytes, 0) / 100.0
+    return "Balance: $balance"
+}
+
+fun isSuccessResponse(response: ByteArray): Boolean {
+    return response.size >= 2 && response[response.size - 2] == 0x90.toByte() && response[response.size - 1] == 0x00.toByte()
+}
+
+fun toInt32(bytes: ByteArray, index: Int): Int {
+    require(bytes.size == 4) { "length must be 4, got: ${bytes.size}" }
+    return ByteBuffer.wrap(bytes, index, 4).order(ByteOrder.LITTLE_ENDIAN).int
 }
