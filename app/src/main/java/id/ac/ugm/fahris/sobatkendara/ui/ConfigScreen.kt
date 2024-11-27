@@ -50,10 +50,10 @@ fun ConfigScreen(
     var flagAccidentMovementAlert by rememberSaveable { mutableStateOf(false) }
     var flagAccidentAudioAlert by rememberSaveable { mutableStateOf(false) }
 
-    var headlightThreshold by rememberSaveable { mutableStateOf(50f) }
-    var drowsinessThreshold by rememberSaveable { mutableStateOf(50f) }
-    var accidentShakinessThreshold by rememberSaveable { mutableStateOf(50f) }
-    var accidentSoundThreshold by rememberSaveable { mutableStateOf(50f) }
+    var headlightThreshold by rememberSaveable { mutableStateOf(10f) }
+    var drowsinessThreshold by rememberSaveable { mutableStateOf(300f) }
+    var accidentShakinessThreshold by rememberSaveable { mutableStateOf(25f) }
+    var accidentSoundThreshold by rememberSaveable { mutableStateOf(20000f) }
     var isLoading by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -67,6 +67,11 @@ fun ConfigScreen(
         flagDrowsinessAlert = sharedPreferences.getBoolean("flag_drowsiness_alert", true)
         flagAccidentMovementAlert = sharedPreferences.getBoolean("flag_accident_movement_alert", true)
         flagAccidentAudioAlert = sharedPreferences.getBoolean("flag_accident_audio_alert", true)
+
+        headlightThreshold = sharedPreferences.getFloat("headlight_threshold", 10f)
+        drowsinessThreshold = sharedPreferences.getFloat("drowsiness_threshold", 300f)
+        accidentShakinessThreshold = sharedPreferences.getFloat("accident_shakiness_threshold", 25f)
+        accidentSoundThreshold = sharedPreferences.getFloat("accident_sound_threshold", 20000f)
 
         val profile = ApiService.getProfile(context, token?:"", onGetProfileError = {message ->
             Toast.makeText(context, "Failed to get profile: $message", Toast.LENGTH_SHORT).show()
@@ -167,39 +172,61 @@ fun ConfigScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
             // Sliders for thresholds
+            // 0 - 50 lux
             ThresholdSlider(
                 label = "Headlight Threshold",
                 value = headlightThreshold,
-                onValueChange = { headlightThreshold = it }
+                unit = "lux",
+                valueRange = 0f..50f,
+                onValueChange = {
+                    headlightThreshold = it
+                    sharedPreferences.edit().putFloat("headlight_threshold", it).apply()
+                }
             )
-
+            // 0 - 1500
             ThresholdSlider(
                 label = "Drowsiness Threshold",
                 value = drowsinessThreshold,
-                onValueChange = { drowsinessThreshold = it }
+                unit = "dB",
+                valueRange = 0f..1500f,
+                onValueChange = {
+                    drowsinessThreshold = it
+                    sharedPreferences.edit().putFloat("drowsiness_threshold", it).apply()
+                }
             )
-
+            // 10 - 100 m/s2
+            // 10 - 100 rad/s
             ThresholdSlider(
                 label = "Accident Shakiness Threshold",
                 value = accidentShakinessThreshold,
-                onValueChange = { accidentShakinessThreshold = it }
+                unit = "m/s²",
+                valueRange = 10f..100f,
+                onValueChange = {
+                    accidentShakinessThreshold = it
+                    sharedPreferences.edit().putFloat("accident_shakiness_threshold", it).apply()
+                }
             )
-
+            // 1000 - 40000
             ThresholdSlider(
                 label = "Accident Sound Threshold",
                 value = accidentSoundThreshold,
-                onValueChange = { accidentSoundThreshold = it }
+                unit = "dB",
+                valueRange = 1000f..40000f,
+                onValueChange = {
+                    accidentSoundThreshold = it
+                    sharedPreferences.edit().putFloat("accident_sound_threshold", it).apply()
+                }
             )
         }
     }
 }
 @Composable
-fun ThresholdSlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
-    Text("$label: ${value.toInt()}%", fontSize = 18.sp)
+fun ThresholdSlider(label: String, value: Float, unit: String, valueRange: ClosedFloatingPointRange<Float>, onValueChange: (Float) -> Unit) {
+    Text("$label: ${value.toInt()} $unit", fontSize = 18.sp)
     Slider(
         value = value,
         onValueChange = onValueChange,
-        valueRange = 0f..100f,
+        valueRange = valueRange,
         modifier = Modifier.padding(vertical = 8.dp)
     )
 }

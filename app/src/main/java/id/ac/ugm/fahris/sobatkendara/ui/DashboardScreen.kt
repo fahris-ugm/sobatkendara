@@ -242,10 +242,11 @@ fun DashboardScreen(
 
         val flagHeadlightAlert = sharedPreferences.getBoolean("flag_headlight_alert", true)
         if (flagHeadlightAlert) {
+            val headlightThreshold = sharedPreferences.getFloat("headlight_threshold", 10f)
             val ambientLightMonitor = remember {
                 AmbientLightMonitor(
                     context = context,
-                    lowLightThreshold = 10.0f, // Adjust threshold as needed
+                    lowLightThreshold = headlightThreshold,
                     durationThreshold = 5000L // 5 seconds
                 )
             }
@@ -263,9 +264,13 @@ fun DashboardScreen(
 
         val flagDrowsinessAlert = sharedPreferences.getBoolean("flag_drowsiness_alert", true)
         val flagAccidentAudioAlert = sharedPreferences.getBoolean("flag_accident_audio_alert", true)
+        val drowsinessThreshold = sharedPreferences.getFloat("drowsiness_threshold", 300f)
+        val accidentSoundThreshold = sharedPreferences.getFloat("accident_sound_threshold", 20000f)
         // Start and stop drowsiness detection
         DisposableEffect(Unit) {
             audioEventDetector.start(
+                silenceThreshold = drowsinessThreshold.toInt(),
+                accidentThreshold = accidentSoundThreshold.toInt(),
                 onDrowsinessChanged = { isDrowsy ->
                     isShowDrowsinessAlert = isDrowsy
                     if (isDrowsy && flagDrowsinessAlert) {
@@ -294,10 +299,14 @@ fun DashboardScreen(
 
         }
 
-
         val flagAccidentMovementAlert = sharedPreferences.getBoolean("flag_accident_movement_alert", true)
         if (flagAccidentMovementAlert) {
-            val accidentDetector = remember { AccidentDetector(context) }
+            val accidentShakinessThreshold = sharedPreferences.getFloat("accident_shakiness_threshold", 25f)
+            val accidentDetector = remember { AccidentDetector(
+                context,
+                accelerationThreshold = accidentShakinessThreshold,
+                angularVelocityThreshold = accidentShakinessThreshold
+            ) }
             // Start and stop accident detection
             DisposableEffect(Unit) {
                 accidentDetector.start {

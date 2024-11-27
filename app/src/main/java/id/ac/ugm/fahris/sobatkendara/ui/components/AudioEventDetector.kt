@@ -29,7 +29,12 @@ class AudioEventDetector(
 
     // Start capturing audio
     @SuppressLint("MissingPermission")
-    fun start(onDrowsinessChanged: (Boolean) -> Unit, onAccidentDetected: (threshold: Double, value: Double) -> Unit) {
+    fun start(
+        silenceThreshold: Int = 300,
+        accidentThreshold: Int = 20000,
+        onDrowsinessChanged: (Boolean) -> Unit,
+        onAccidentDetected: (threshold: Double, value: Double) -> Unit
+    ) {
         this.onDrowsinessChanged = onDrowsinessChanged
         this.onAccidentDetected = onAccidentDetected
         val bufferSize = AudioRecord.getMinBufferSize(
