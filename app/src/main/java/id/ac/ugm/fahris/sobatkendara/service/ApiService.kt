@@ -21,9 +21,9 @@ object ApiService {
     private val connectionTimeout = 3000
     private val BASE_URL: String
         get() = when (ENVIRONMENT) {
-            "development" -> "https://192.168.26.128:8443"
+            "development" -> "https://192.168.166.128:8443"
             "production" -> "https://sk-service-414032994764.us-central1.run.app"
-            else -> "https://192.168.26.128:8443"
+            else -> "https://192.168.166.128:8443"
         }
 
     suspend fun login(context: Context, email: String, password: String, onLoginError: (String) -> Unit): String? {
@@ -588,6 +588,7 @@ object ApiService {
 
                 // Check the response code
                 val responseCode = httpsURLConnection.responseCode
+                Log.d("ApiService", "Response Code: $responseCode")
                 if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                     // Read the response
                     val reader = BufferedReader(InputStreamReader(httpsURLConnection.inputStream))

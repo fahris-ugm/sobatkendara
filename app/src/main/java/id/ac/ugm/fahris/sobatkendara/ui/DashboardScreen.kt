@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
+import android.util.JsonToken
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Scaffold
@@ -56,7 +60,10 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import id.ac.ugm.fahris.sobatkendara.R
+import id.ac.ugm.fahris.sobatkendara.service.AlertRequest
+import id.ac.ugm.fahris.sobatkendara.service.ApiService
 import id.ac.ugm.fahris.sobatkendara.service.GeocodingApiService
+import id.ac.ugm.fahris.sobatkendara.ui.components.AccidentDetector
 import id.ac.ugm.fahris.sobatkendara.ui.components.AmbientLightMonitor
 
 
@@ -66,6 +73,7 @@ import id.ac.ugm.fahris.sobatkendara.ui.components.FusionSpeedCalculator
 import id.ac.ugm.fahris.sobatkendara.ui.components.SpeedCalculator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -85,6 +93,7 @@ fun DashboardScreen(
     var isPermissionGranted by remember { mutableStateOf(false) }
     var isShowHeadlightAlert by rememberSaveable { mutableStateOf(false)}
     var isShowDrowsinessAlert by rememberSaveable { mutableStateOf(false)}
+    var isShowAccidentDialog by rememberSaveable { mutableStateOf(false) }
 
     var isJourneyActive by rememberSaveable { mutableStateOf(false) }
 
@@ -212,6 +221,33 @@ fun DashboardScreen(
         }
 
          */
+        val accidentDetector = remember { AccidentDetector(context) }
+        // Start and stop accident detection
+        DisposableEffect(Unit) {
+            accidentDetector.start {
+                // Accident detected
+                coroutineScope.launch {
+                    val sharedPreferences = context.getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+                    val token = sharedPreferences.getString("auth_token", null)
+                    val alert: AlertRequest = AlertRequest(
+                        Date(),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        "unknown"
+                    )
+
+                    ApiService.sendAlert(context, token?:"", alert, onSendAlertError = {message ->
+                        Toast.makeText(context, "Failed to send alert: $message", Toast.LENGTH_SHORT).show()
+                    })
+                }
+                isShowAccidentDialog = true
+            }
+            onDispose {
+                accidentDetector.stop()
+            }
+        }
     }
 
     Scaffold(
@@ -223,6 +259,11 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
+
+            if (isShowAccidentDialog) {
+                AccidentWarningDialog { isShowAccidentDialog = false }
+            }
             // Warning Text
             if (isShowHeadlightAlert) {
                 Box(
@@ -456,3 +497,16 @@ fun getCompassDirection(bearing: Float): String {
     }
 }
 
+@Composable
+fun AccidentWarningDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Accident Detected!") },
+        text = { Text("An accident has been detected. Emergency services have been notified.") },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("OK")
+            }
+        }
+    )
+}
