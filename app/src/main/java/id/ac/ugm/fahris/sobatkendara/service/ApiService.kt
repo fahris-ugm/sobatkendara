@@ -16,7 +16,7 @@ import javax.net.ssl.HttpsURLConnection
 
 object ApiService {
     // Toggle between different environments
-    private const val ENVIRONMENT = "development" // or "production"
+    private const val ENVIRONMENT = "production" // or "production"
 
     private val connectionTimeout = 3000
     private val BASE_URL: String

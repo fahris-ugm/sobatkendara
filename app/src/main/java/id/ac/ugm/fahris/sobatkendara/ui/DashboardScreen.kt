@@ -152,12 +152,12 @@ fun DashboardScreen(
             val location = currentLocation.latitude.toString() + "," + currentLocation.longitude.toString()
             Log.d("DashboardScreen", "soundThreshold: $soundThreshold, soundValue: $soundValue, shakeThreshold: $shakeThreshold, shakeValue: $shakeValue, location: $location")
             val alert = AlertRequest(
-                Date(),
-                soundThreshold,
-                soundValue,
-                shakeThreshold,
-                shakeValue,
-                location
+                eventTimestamp = Date(),
+                soundDecibelValue =  soundValue,
+                soundDecibelThreshold = soundThreshold,
+                shakeValue = shakeValue,
+                shakeThreshold = shakeThreshold,
+                gpsLocation = location
             )
 
             ApiService.sendAlert(context, token?:"", alert, onSendAlertError = {message ->
