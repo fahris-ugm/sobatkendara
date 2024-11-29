@@ -21,7 +21,7 @@ import id.ac.ugm.fahris.sobatkendara.MainNavOption
 fun <T> AppDrawerItem(item: AppDrawerItemInfo<T>, onClick: (options: T) -> Unit) =
     Surface(
         color = MaterialTheme.colorScheme.onPrimary,
-        modifier = Modifier.width(200.dp).padding(16.dp),
+        modifier = Modifier.width(300.dp).padding(16.dp),
         onClick = { onClick(item.drawerOption) },
         shape = RoundedCornerShape(50),
     ) {

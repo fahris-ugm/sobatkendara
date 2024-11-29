@@ -20,7 +20,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -115,127 +117,133 @@ fun LoginScreen(
     val context = LocalContext.current
 
     val alphaLoading = if (isLoading) 1f else 0f
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-
-        Image(
-            painter = painterResource(id = R.drawable.sobatkendara_logo),
-            contentDescription = "Logo",
-            modifier = Modifier.padding(bottom = 16.dp, start = 32.dp, end = 32.dp),
-            contentScale = ContentScale.FillWidth
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            readOnly = isLoading,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth(),
-            value = password,
-            onValueChange = { newText ->
-                password = newText
-            },
-            label = {
-                Text(text = "Password")
-            },
-            placeholder = { Text(text = "Type password here") },
-            readOnly = isLoading,
-            shape = RoundedCornerShape(percent = 20),
-            visualTransformation = if (showPassword) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            trailingIcon = {
-                if (showPassword) {
-                    IconButton(onClick = { showPassword = false }) {
-                        Icon(
-                            imageVector = Icons.Filled.Visibility,
-                            contentDescription = "hide_password"
-                        )
-                    }
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+
+            Image(
+                painter = painterResource(id = R.drawable.sobatkendara_logo),
+                contentDescription = "Logo",
+                modifier = Modifier.padding(bottom = 16.dp, start = 32.dp, end = 32.dp),
+                contentScale = ContentScale.FillWidth
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                readOnly = isLoading,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                value = password,
+                onValueChange = { newText ->
+                    password = newText
+                },
+                label = {
+                    Text(text = "Password")
+                },
+                placeholder = { Text(text = "Type password here") },
+                readOnly = isLoading,
+                shape = RoundedCornerShape(percent = 20),
+                visualTransformation = if (showPassword) {
+                    VisualTransformation.None
                 } else {
-                    IconButton(
-                        onClick = { showPassword = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.VisibilityOff,
-                            contentDescription = "hide_password"
-                        )
-                    }
-                }
-            }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        // Show ProgressBar when loading
-        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).alpha(alphaLoading))
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = {
-                if (email.isEmpty() || password.isEmpty()) {
-                    Toast.makeText(context, "Please enter all fields", Toast.LENGTH_SHORT).show()
-                } else {
-                    isLoading = true
-                    CoroutineScope(Dispatchers.Main).launch {
-                        val token = ApiService.login(context, email, password,
-                            onLoginError = { message ->
-                                errorMessage = message
-                            }
-                        )
-                        Log.d("LoginScreen", "Token: $token")
-                        isLoading = false
-                        if (token != null) {
-                            Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess(email, token)
-                        } else {
-                            //Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
+                    PasswordVisualTransformation()
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    if (showPassword) {
+                        IconButton(onClick = { showPassword = false }) {
+                            Icon(
+                                imageVector = Icons.Filled.Visibility,
+                                contentDescription = "hide_password"
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { showPassword = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.VisibilityOff,
+                                contentDescription = "hide_password"
+                            )
                         }
                     }
                 }
-            },
-            enabled = !isLoading,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Login")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = errorMessage,
-            color = Color.Red,
-            modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Sign Up and Forgot Password options
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "Sign Up",
-                fontSize = 16.sp,
-                modifier = Modifier.clickable { if (!isLoading) onSignUp() }
             )
-
-            Text(
-                text = "Forgot Password?",
-                fontSize = 16.sp,
-                textAlign = TextAlign.End,
-                modifier = Modifier.clickable { if (!isLoading) onForgotPassword() }
+            Spacer(modifier = Modifier.height(16.dp))
+            // Show ProgressBar when loading
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.CenterHorizontally).alpha(alphaLoading)
             )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    if (email.isEmpty() || password.isEmpty()) {
+                        Toast.makeText(context, "Please enter all fields", Toast.LENGTH_SHORT)
+                            .show()
+                    } else {
+                        isLoading = true
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val token = ApiService.login(context, email, password,
+                                onLoginError = { message ->
+                                    errorMessage = message
+                                }
+                            )
+                            Log.d("LoginScreen", "Token: $token")
+                            isLoading = false
+                            if (token != null) {
+                                Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT)
+                                    .show()
+                                onLoginSuccess(email, token)
+                            } else {
+                                //Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Login")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = errorMessage,
+                color = Color.Red,
+                modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Sign Up and Forgot Password options
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Sign Up",
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable { if (!isLoading) onSignUp() }
+                )
+
+                Text(
+                    text = "Forgot Password?",
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.clickable { if (!isLoading) onForgotPassword() }
+                )
+            }
         }
     }
 }
